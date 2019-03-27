@@ -188,14 +188,17 @@ public class IMServer implements Closeable {
                     managerList.close();
                 }
 
+                int closedClientCount = 0;
                 for (String clientId : ESTABLISHED_CLIENT_MAP.keySet()) {
                     IMClient client = ESTABLISHED_CLIENT_MAP.get(clientId);
                     if (client != null && client.isActive()) {
                         client.close();
+                        closedClientCount++;
                     }
                 }
 
                 LinkedHashMap<String, Object> params = buildParamsMap();
+                params.put("closedClientCount", closedClientCount);
                 params.put("cost", (System.currentTimeMillis() - startTime) + "ms");
                 RAVEN_IM_CLIENT_LOG.info("Stopped IMServerTask.{}", LogBuildUtil.build(params));
             } catch (Exception e) {
@@ -204,16 +207,6 @@ public class IMServer implements Closeable {
                 LOGGER.error("IMServerTask fails to stop: `unexpected error`." + LogBuildUtil.build(params), e);
             }
         }
-    }
-
-    @Override
-    public String toString() {
-        return "IMServer{" +
-                "configuration=" + configuration +
-                ", clientInterceptor=" + clientInterceptor +
-                ", clientMonitor=" + clientMonitor +
-                ", state=" + state +
-                '}';
     }
 
     /**
@@ -274,6 +267,15 @@ public class IMServer implements Closeable {
         return Collections.unmodifiableMap(ESTABLISHED_CLIENT_MAP);
     }
 
+    /**
+     * 判断当前 IMServer 是否可用。
+     *
+     * @return 当前 IMServer 是否可用
+     */
+    public boolean isActive() {
+        return state == BeanStatusEnum.NORMAL;
+    }
+
     private LinkedHashMap<String, Object> buildParamsMap() {
         LinkedHashMap<String, Object> params = new LinkedHashMap<>();
         params.put("configuration", configuration);
@@ -294,6 +296,16 @@ public class IMServer implements Closeable {
                         "unexpected error", params), e);
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        return "IMServer{" +
+                "configuration=" + configuration +
+                ", clientInterceptor=" + clientInterceptor +
+                ", clientMonitor=" + clientMonitor +
+                ", state=" + state +
+                '}';
     }
 
     private class IMServerTask extends Thread {
