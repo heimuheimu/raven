@@ -363,7 +363,7 @@ public class IMClientManager implements Closeable {
                                                 params.put("local", channel.getLocalAddress());
                                             } catch (Exception ignored) {}
                                             params.put("id", client.getId());
-                                            params.put("manager", getName());
+                                            params.put("manager", IMClientManager.this.getName());
                                             RAVEN_IM_CLIENT_LOG.info("IMClient has reached end-of-stream.{}", LogBuildUtil.build(params));
                                             client.close();
                                         }
@@ -375,7 +375,7 @@ public class IMClientManager implements Closeable {
                                         params.put("local", client.getSocketChannel().getLocalAddress());
                                     } catch (Exception ignored) {}
                                     params.put("id", client.getId());
-                                    params.put("manager", getName());
+                                    params.put("manager", IMClientManager.this.getName());
                                     RAVEN_IM_CLIENT_LOG.error("IMClient fails to communicate: `unexpected error`." + LogBuildUtil.build(params), e);
                                     executionMonitor.onError(IMClientManagerMonitor.ERROR_CODE_FAILS_TO_COMMUNICATE);
                                     client.close();
