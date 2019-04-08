@@ -1,5 +1,7 @@
 # Raven: 产品级别 IM 服务搭建底层框架。
 
+[![Language grade: Java](https://img.shields.io/lgtm/grade/java/g/heimuheimu/raven.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/heimuheimu/raven/context:java)
+
 ## 使用要求
 * JDK 版本：1.8+ 
 * 依赖类库：
