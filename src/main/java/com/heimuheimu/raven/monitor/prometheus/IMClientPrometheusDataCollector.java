@@ -66,7 +66,7 @@ public class IMClientPrometheusDataCollector implements PrometheusCollector {
             establishedClientCount = Math.max(server.getEstablishedClientCount(), 0);
         }
         dataList.add(PrometheusData.buildGauge("raven_client_established_count", "")
-                .addSample(PrometheusSample.build(deltaCalculator.delta("EstablishedCount", establishedClientCount))));
+                .addSample(PrometheusSample.build(establishedClientCount)));
         // add raven_client_created_count
         dataList.add(PrometheusData.buildGauge("raven_client_created_count", "")
                 .addSample(PrometheusSample.build(deltaCalculator.delta("CreatedCount", monitor.getCreatedCount()))));
