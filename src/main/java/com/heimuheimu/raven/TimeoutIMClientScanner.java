@@ -168,7 +168,7 @@ public class TimeoutIMClientScanner implements Closeable {
                                 params.put("local", client.getSocketChannel().getLocalAddress());
                             } catch (Exception ignored) {}
                             params.put("id", client.getId());
-                            RAVEN_IM_CLIENT_LOG.warn("IMClient timeout.{}", LogBuildUtil.build(params));
+                            RAVEN_IM_CLIENT_LOG.error("IMClient timeout.{}", LogBuildUtil.build(params));
                             client.close();
                         }
                     }
