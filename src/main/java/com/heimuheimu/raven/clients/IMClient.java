@@ -210,30 +210,39 @@ public class IMClient implements Closeable {
      */
     public void asyncSend(ByteMessage message) throws IllegalArgumentException, IllegalStateException, RavenException {
         if (message == null) {
+            BYTE_MESSAGE_MONITOR.onError();
             String errorMessage = "IMClient fails to send message: `null ByteMessage`. `client`:`" + toString() + "`.";
             LOGGER.error(errorMessage);
-            BYTE_MESSAGE_MONITOR.onError();
             throw new IllegalArgumentException(errorMessage);
         }
         if (state != BeanStatusEnum.NORMAL) {
+            BYTE_MESSAGE_MONITOR.onError();
             String errorMessage = "IMClient fails to send message: `illegal state`. `messageId`:`" + message.getId() +
                     "`. `client`:`" + toString() + "`.";
             LOGGER.error(errorMessage);
-            BYTE_MESSAGE_MONITOR.onError();
             throw new IllegalStateException(errorMessage);
         }
 
         synchronized (writeLock) {
+            messageList.add(message);
             try {
                 setReadonly(false);
             } catch (Exception e) {
+                BYTE_MESSAGE_MONITOR.onError();
+                LinkedHashMap<String, Object> params = new LinkedHashMap<>();
+                try {
+                    params.put("remote", socketChannel.getRemoteAddress());
+                    params.put("local", socketChannel.getLocalAddress());
+                } catch (Exception ignored) {}
+                params.put("id", getId());
+                RAVEN_IM_CLIENT_LOG.error("IMClient fails to set readonly." + LogBuildUtil.build(params), e);
+                close();
+
                 String errorMessage = "IMClient fails to send message: `set readonly failed`. `messageId`:`" + message.getId() +
                         "`. `client`:`" + toString() + "`.";
                 LOGGER.error(errorMessage, e);
-                BYTE_MESSAGE_MONITOR.onError();
                 throw new RavenException(errorMessage, e);
             }
-            messageList.add(message);
         }
 
         BYTE_MESSAGE_MONITOR.onCreated(message.getContent().length);
@@ -246,7 +255,7 @@ public class IMClient implements Closeable {
      */
     public ByteBuffer getBufferForWrite() {
         synchronized (writeLock) {
-            if (writeBuffer == null || writeBuffer.remaining() == 0) {
+            if (writeBuffer == null) {
                 buildByteBufferForWrite();
                 if (maxWriteByteLength > 0) {
                     if (writeBuffer != null && writeBuffer.remaining() > maxWriteByteLength) {
@@ -273,10 +282,13 @@ public class IMClient implements Closeable {
                     for (long messageCreatedTime : messageCreatedTimeArray) {
                         BYTE_MESSAGE_MONITOR.onSent(System.currentTimeMillis() - messageCreatedTime);
                     }
+                    messageCreatedTimeArray = null;
+
                     if (clientListener != null) {
                         clientListener.onSent(this, messageIdArray);
                     }
-
+                    messageIdArray = null;
+                    writeBuffer = null;
                     if (messageList.isEmpty()) { // 并且没有新的字节消息，将 IMClient 切换为只读模式
                         setReadonly(true);
                     }
@@ -290,25 +302,21 @@ public class IMClient implements Closeable {
 
     private void buildByteBufferForWrite() {
         synchronized (writeLock) {
-            if (messageList.isEmpty()) {
-                this.writeBuffer = null;
-                this.messageIdArray = null;
-                this.messageCreatedTimeArray = null;
-            } else {
+            if (!messageList.isEmpty()) {
                 if (messageList.size() == 1) {
                     ByteMessage message = messageList.get(0);
-                    this.messageIdArray = new String[] {message.getId()};
-                    this.messageCreatedTimeArray = new long[] {message.getCreatedTime()};
-                    this.writeBuffer = ByteBuffer.wrap(message.getContent());
+                    messageIdArray = new String[] {message.getId()};
+                    messageCreatedTimeArray = new long[] {message.getCreatedTime()};
+                    writeBuffer = ByteBuffer.wrap(message.getContent());
                 } else {
-                    this.messageIdArray = new String[messageList.size()];
-                    this.messageCreatedTimeArray = new long[messageList.size()];
+                    messageIdArray = new String[messageList.size()];
+                    messageCreatedTimeArray = new long[messageList.size()];
 
                     int byteLength = 0;
                     for (int i = 0; i < messageList.size(); i++) {
                         ByteMessage message = messageList.get(i);
-                        this.messageIdArray[i] = message.getId();
-                        this.messageCreatedTimeArray[i] = message.getCreatedTime();
+                        messageIdArray[i] = message.getId();
+                        messageCreatedTimeArray[i] = message.getCreatedTime();
                         byteLength += message.getContent().length;
                     }
 
@@ -320,9 +328,8 @@ public class IMClient implements Closeable {
                         offset += content.length;
                     }
 
-                    this.writeBuffer = ByteBuffer.wrap(mergedContent);
+                    writeBuffer = ByteBuffer.wrap(mergedContent);
                 }
-
                 messageList = new ArrayList<>();
             }
         }
