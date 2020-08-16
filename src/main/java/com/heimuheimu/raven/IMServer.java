@@ -28,7 +28,6 @@ import com.heimuheimu.raven.clients.*;
 import com.heimuheimu.raven.clients.support.IMClientUUIDGenerator;
 import com.heimuheimu.raven.constant.BeanStatusEnum;
 import com.heimuheimu.raven.exception.RavenException;
-import com.heimuheimu.raven.exception.RejectedRegisterException;
 import com.heimuheimu.raven.monitor.IMClientMonitor;
 import com.heimuheimu.raven.net.SocketConfiguration;
 import com.heimuheimu.raven.util.LogBuildUtil;
@@ -367,25 +366,25 @@ public class IMServer implements Closeable {
                                 IMClient client = new IMClient(id, socketChannel, manager.getSelector(),
                                         configuration.getMaxWriteByteLength(), configuration.getClientListener(),
                                         IMServer.this::onClientClosed);
+                                ESTABLISHED_CLIENT_MAP.put(id, client);
+                                clientMonitor.onCreated();
+                                params.put("manager", manager.getName());
+                                params.put("cost", (System.currentTimeMillis() - startTime) + "ms");
+                                RAVEN_IM_CLIENT_LOG.info("Accepts a IMClient success.{}", LogBuildUtil.build(params));
+                                try {
+                                    clientInterceptor.onCreated(client);
+                                } catch (Exception e) {
+                                    params.put("cost", (System.currentTimeMillis() - startTime) + "ms");
+                                    RAVEN_IM_CLIENT_LOG.error("IMClient fails to establish: `execute interceptor failed`." + LogBuildUtil.build(params), e);
+                                    clientMonitor.onError(IMClientMonitor.ERROR_CODE_FAILS_TO_ESTABLISH);
+                                    client.close();
+                                    continue;
+                                }
                                 try {
                                     manager.register(client);
-                                    clientInterceptor.onCreated(client);
-                                    ESTABLISHED_CLIENT_MAP.put(id, client);
-                                    params.put("manager", manager.getName());
-                                    params.put("cost", (System.currentTimeMillis() - startTime) + "ms");
-                                    RAVEN_IM_CLIENT_LOG.info("Accepts a IMClient success.{}", LogBuildUtil.build(params));
-                                    clientMonitor.onCreated();
                                 } catch (Exception e) {
-                                    String reason;
-                                    if (e instanceof IllegalStateException) {
-                                        reason = "illegal state";
-                                    } else if (e instanceof RejectedRegisterException) {
-                                        reason = "too many IMClient";
-                                    } else {
-                                        reason = "unexpected error";
-                                    }
                                     params.put("cost", (System.currentTimeMillis() - startTime) + "ms");
-                                    RAVEN_IM_CLIENT_LOG.error("IMClient fails to establish: `" + reason + "`." + LogBuildUtil.build(params), e);
+                                    RAVEN_IM_CLIENT_LOG.error("IMClient fails to establish: `register failed`." + LogBuildUtil.build(params), e);
                                     clientMonitor.onError(IMClientMonitor.ERROR_CODE_FAILS_TO_ESTABLISH);
                                     client.close();
                                 }
